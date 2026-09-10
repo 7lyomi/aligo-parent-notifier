@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>학부모 알림톡 발송 도구 v7</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">학원 업무 도구 · v7</p>
+        <h1>학부모 알림톡 발송 도구</h1>
+        <p class="sub">학생 ID로 학습 기록을 연결하고, <strong>테스트 없음·주간·월간</strong> 안내를 준비하세요.</p>
+      </div>
+      <div class="status-card">
+        <div class="status-line"><span>테스트 없는 날</span><strong>{{ config.template_none }}</strong></div>
+        <div class="status-line"><span>주간 테스트</span><strong>{{ config.template_weekly }}</strong></div>
+        <div class="status-line"><span>월간 테스트</span><strong>{{ config.template_monthly }}</strong></div>
+        <div class="status-line"><span>Sender Key</span><strong>{{ config.sender_key_set }}</strong></div>
+        <div class="status-line"><span>API Key</span><strong>{{ config.key_set }}</strong></div>
+        <div class="status-line"><span>모드</span><strong class="pill {{ 'safe' if config.test_mode == 'Y' else 'warn' }}">{{ '데모 모드' if config.demo else 'API 테스트' if config.test_mode == 'Y' else '실발송' }}</strong></div>
+        <form method="post" action="{{ url_for('check_api') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button type="submit" class="ghost full">API·템플릿 설정 확인</button>
+        </form>
+      </div>
+    </header>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-stack">
+          {% for category, message in messages %}<div class="flash {{ category }}">{{ message }}</div>{% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <section class="summary-grid">
+      <div class="metric"><span>미리보기</span><strong>{{ stats.total }}</strong><small>건 · 없음 {{ stats.none_count }} / 주간 {{ stats.weekly_count }} / 월간 {{ stats.monthly_count }}</small></div>
+      <div class="metric"><span>입력 확인 완료</span><strong>{{ stats.ready_count }}</strong><small>학생 정보·입력값 확인 완료</small></div>
+      <div class="metric {{ 'danger-soft' if stats.blocked_count else '' }}"><span>확인 필요</span><strong>{{ stats.blocked_count }}</strong><small>누락 또는 설정 오류</small></div>
+      <div class="metric"><span>{{ "실제 청구액" if config.demo else "예상 발송비" }}</span><strong>{{ "0" if config.demo else stats.estimated_total }}</strong><small>{{ "원 · 데모에서는 비용이 발생하지 않아요" if config.demo else "원 · VAT 별도 · 중복 제외 전 예상" }}</small></div>
+    </section>
+
+    {% if config.demo %}
+      <div class="notice info"><strong>가상 학생으로 체험 중</strong> · 실제 전송과 요금 부과 없이 메시지 생성과 중복 방지를 확인할 수 있어요.</div>
+    {% elif config.test_mode == 'Y' %}
+      <div class="notice info">현재 <strong>연동 테스트 모드</strong>입니다. 실제 카카오톡은 오지 않습니다. 승인된 코드 3개를 입력한 뒤 1건 실수신 확인 때만 <code>ALIGO_TEST_MODE=N</code>으로 바꾸세요.</div>
+    {% else %}
+      <div class="notice warning">현재 <strong>실발송 모드</strong>입니다. 일반 발송 전에 아래에서 유형별 본인 번호 수신 확인을 완료해주세요.</div>
+    {% endif %}
+
+    <section class="panel steps-panel">
+      <div class="section-title">
+        <div><p class="eyebrow">Step 1</p><h2>엑셀 파일 불러오기</h2></div>
+        <div class="title-actions"><a class="ghost-link" href="{{ url_for('download_sample') }}">샘플 엑셀</a>{% if config.demo %}<form method="post" action="{{ url_for('load_demo') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="primary">가상 샘플 불러오기</button></form>{% endif %}<form method="post" action="{{ url_for('clear_preview_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="ghost">미리보기 비우기</button></form></div>
+      </div>
+      <form method="post" action="{{ url_for('preview') }}" enctype="multipart/form-data" class="upload-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="upload-grid">
+          <label class="file-card featured"><span class="file-title">통합 엑셀 파일</span><span class="file-desc">학생DB와 데일리 리포트 시트가 한 파일 안에 있으면 이것만 선택하세요.</span><input type="file" name="combined_file" accept=".xlsx,.xlsm,.xltx,.xltm"></label>
+          <label class="file-card"><span class="file-title">데일리 리포트 별도 파일 · 선택</span><span class="file-desc">학생DB와 리포트가 서로 다른 파일일 때만 선택하세요.</span><input type="file" name="daily_report_file" accept=".xlsx,.xlsm,.xltx,.xltm"></label>
+        </div>
+        <p class="helper">두 시트의 <strong>학생ID</strong>를 맞춰주세요. ID가 없으면 이름이 유일한 학생만 연결합니다. 데일리 리포트의 <strong>테스트구분</strong>은 <code>없음</code>, <code>주간</code>, <code>월간</code> 중 하나로 입력하세요. 테스트 없음은 레벨·점수·평균을 비워도 되고, 주간·월간은 레벨 1~7과 점수·평균이 필요합니다.</p>
+        <div class="button-row"><button type="submit" class="primary">미리보기 생성</button></div>
+      </form>
+    </section>
+
+    {% if not config.demo %}<section class="panel test-panel">
+      <details><summary>유형별 본인 번호 수신 확인</summary>
+        <p class="helper">해당 유형의 학생 1명 선택 → 본인 번호 1건 테스트 → 휴대전화 수신 확인. 수신번호는 .env의 ALIGO_TEST_PHONE입니다.</p>
+        {% for entry in test_status.entries %}<form class="receipt-form" method="post" action="{{ url_for('confirm_test') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="kind" value="{{ entry.kind }}"><strong>{{ entry.kind }}</strong>
+        {% if entry.confirmed %}<span class="ready-badge">수신 확인 완료</span>{% elif entry.requested %}<label><input type="checkbox" name="receipt_confirmed" value="yes" required> 실제 휴대전화에서 수신 확인</label><button class="secondary">확인 기록</button>{% else %}<span class="muted">1건 요청 전</span>{% endif %}</form>{% endfor %}
+        <form method="post" action="{{ url_for('reset_test_status') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="ghost">수신 확인 초기화</button></form>
+      </details>
+    </section>{% endif %}
+
+    <section class="panel preview-panel">
+      <div class="section-title sticky-title">
+        <div><p class="eyebrow">Step 2</p><h2>템플릿 유형과 변수 확인</h2></div>
+        <div class="title-actions">
+          {% if has_log %}<a class="ghost-link" href="{{ url_for('download_log') }}">발송로그 다운로드</a>{% endif %}
+          <button type="button" class="ghost" onclick="toggleAll(true)">전체 선택</button>
+          <button type="button" class="ghost" onclick="toggleAll(false)">전체 해제</button>
+        </div>
+      </div>
+
+      <form method="post" action="{{ url_for('send') }}" id="sendForm"><input type="hidden" name="preview_revision" value="{{ preview_revision }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th class="check-col">선택</th><th>학생 / 학부모</th><th>템플릿 변수</th><th>실제 알림톡 미리보기</th><th>상태</th></tr></thead>
+            <tbody>
+              {% for row in preview_rows %}
+              <tr class="{{ 'blocked-row' if not row.is_ready else '' }}">
+                <td class="check-col"><input type="checkbox" name="selected" value="{{ loop.index0 }}" {{ 'disabled' if not row.is_ready or row.delivery_state in blocking_states else '' }}></td>
+                <td class="identity-cell">
+                  <strong>{{ row.student_name }}</strong><span class="student-id">{{ row.student_id or "이름으로 연결" }}</span><span class="muted block">{{ row.parent_name }}</span><span class="muted block mono">{{ row.parent_phone or '전화번호 없음' }}</span><span class="muted block">{{ row.date_text or '-' }}</span>
+                  <span class="template-tag">{{ row.template_label }}</span>
+                  <span class="muted block mono small-code">{{ row.template_code or '템플릿 코드 미설정' }}</span>
+                  {% if row.special_note %}<span class="source-note">참고: {{ row.special_note }}</span>{% endif %}
+                </td>
+                <td class="variable-cell">
+                  <div class="field-grid">
+                    <label><span>등원상태</span><input name="attendance_{{ loop.index0 }}" value="{{ row.attendance }}"></label>
+                    <label><span>과제수행률</span><input name="homework_percent_{{ loop.index0 }}" value="{{ row.homework_percent }}"></label>
+                    <label class="wide"><span>미흡과제</span><input name="missing_homework_{{ loop.index0 }}" value="{{ row.missing_homework }}"></label>
+                    <label><span>단어 전체</span><input name="word_total_count_{{ loop.index0 }}" value="{{ row.word_total_count }}"></label>
+                    <label><span>단어 오답</span><input name="word_wrong_count_{{ loop.index0 }}" value="{{ row.word_wrong_count }}"></label>
+                    <label><span>오답시험</span><input name="error_test_status_{{ loop.index0 }}" value="{{ row.error_test_status }}"></label>
+                    <label><span>테스트 구분</span>
+                      <select name="test_type_{{ loop.index0 }}" class="test-type-select" data-row="{{ loop.index0 }}" onchange="toggleTestFields({{ loop.index0 }})">
+                        {% if row.test_type not in test_types %}<option value="" selected>구분 선택 필요</option>{% endif %}{% for kind in test_types %}<option value="{{ kind }}" {{ 'selected' if row.test_type == kind else '' }}>{{ kind }}</option>{% endfor %}
+                      </select>
+                    </label>
+                    <label class="test-field-{{ loop.index0 }} {{ 'field-disabled' if row.test_type == '없음' else '' }}"><span>테스트 레벨 · 숫자 1~7</span><input type="number" min="1" max="7" name="test_level_{{ loop.index0 }}" value="{{ row.test_level }}" {{ 'disabled' if row.test_type == '없음' else '' }}></label>
+                    <label class="test-field-{{ loop.index0 }} {{ 'field-disabled' if row.test_type == '없음' else '' }}"><span>테스트 점수</span><input name="test_score_{{ loop.index0 }}" value="{{ row.test_score }}" {{ 'disabled' if row.test_type == '없음' else '' }}></label>
+                    <label class="test-field-{{ loop.index0 }} {{ 'field-disabled' if row.test_type == '없음' else '' }}"><span>테스트 평균</span><input name="test_average_{{ loop.index0 }}" value="{{ row.test_average }}" {{ 'disabled' if row.test_type == '없음' else '' }}></label>
+                  </div>
+                </td>
+                <td class="message-preview"><pre>{{ row.message }}</pre><span class="tiny">{{ row.message_length }}/{{ max_length }}자 · 선택한 테스트 구분에 맞는 승인 템플릿을 사용합니다.</span></td>
+                <td>
+                  {% if row.delivery_state in blocking_states %}<span class="pending-badge">{{ '데모 처리 완료' if row.delivery_state == 'simulated' else '요청 접수됨' if row.delivery_state == 'accepted' else '전송 여부 확인 필요' }}</span>
+                  {% elif row.is_ready %}<span class="ready-badge">입력 확인 완료</span><span class="block muted cost-text">{{ "0" if config.demo else row.estimated_cost }}원</span>
+                  {% else %}<span class="blocked-badge">확인 필요</span><span class="block error-text">{{ row.missing_fields }}</span>{% endif %}
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5" class="empty">아직 미리보기가 없습니다. 위에서 엑셀 파일을 선택하고 <strong>미리보기 생성</strong>을 눌러주세요.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="send-bar">
+          <div><strong>내용 확인 후 전송</strong><p id="saveHint">수정 내용 저장 → 미리보기 검수 → 대상 선택</p></div>
+          <div class="send-actions">
+            <button type="submit" formaction="{{ url_for('save_preview_edits') }}" class="secondary">변수 저장 / 미리보기 갱신</button>
+            {% if not config.demo and config.test_mode == 'N' %}<button type="submit" formaction="{{ url_for('send_test') }}" class="primary send-action" onclick="return confirmOneTest()">본인 번호 1건 테스트</button>{% endif %}
+            <button type="submit" name="mode" value="selected" class="primary send-action" onclick="return confirmSelected()">{{ "선택 시뮬레이션" if config.demo else "선택 발송" }}</button>
+            <button type="submit" name="mode" value="all" class="secondary send-action" onclick="return confirmAll({{ stats.ready_count }})">{{ "전체 시뮬레이션" if config.demo else "전체 발송" }}</button>
+          </div>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <script>
+    function toggleAll(checked) { document.querySelectorAll('input[name="selected"]:not(:disabled)').forEach(cb => cb.checked = checked); }
+    function selectedCount() { return Array.from(document.querySelectorAll('input[name="selected"]:checked:not(:disabled)')).length; }
+    function confirmOneTest() { const count = selectedCount(); if (count !== 1) { alert('테스트에 사용할 학생을 정확히 1명만 선택해주세요.'); return false; } return confirm('.env에 설정한 본인 번호로 1건 실제 테스트를 요청할까요?'); }
+    function confirmSelected() { const count = selectedCount(); if (!count) { alert('발송 가능한 행을 선택해주세요.'); return false; } return confirm(`선택한 ${count}건을 {{ "시뮬레이션할까요?" if config.demo else "발송 요청할까요?" }}`); }
+    function confirmAll(count) { if (!count) { alert('발송 가능한 행이 없습니다.'); return false; } return confirm(`입력이 올바른 전체 ${count}건을 {{ "시뮬레이션할까요?" if config.demo else "발송 요청할까요?" }}\n이미 처리된 같은 내용은 제외됩니다.`); }
+    function toggleTestFields(rowIndex) {
+      const select = document.querySelector(`select[name="test_type_${rowIndex}"]`);
+      const disabled = select && select.value === '없음';
+      document.querySelectorAll(`.test-field-${rowIndex} input`).forEach(input => {
+        input.disabled = disabled;
+        input.closest('label').classList.toggle('field-disabled', disabled);
+      });
+    }
+    document.querySelectorAll('.field-grid input,.field-grid select').forEach(input => input.addEventListener('input', () => {
+      document.getElementById('saveHint').textContent = '수정한 내용을 저장하고 미리보기를 다시 확인해주세요.';
+      document.querySelectorAll('.send-action').forEach(button => button.disabled = true);
+    }));
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.test-type-select').forEach(select => toggleTestFields(select.dataset.row));
+    });
+  </script>
+</body>
+</html>
