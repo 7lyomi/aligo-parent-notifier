@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>학부모 알림톡 발송 도구 v7</title>
+  <title>학부모 알림톡 발송 도구 v7.1.0</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <div class="app-shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">학원 업무 도구 · v7</p>
+        <p class="eyebrow">학원 업무 도구 · v7.1.0</p>
         <h1>학부모 알림톡 발송 도구</h1>
         <p class="sub">학생 ID로 학습 기록을 연결하고, <strong>테스트 없음·주간·월간</strong> 안내를 준비하세요.</p>
       </div>
@@ -21,7 +21,7 @@
         <div class="status-line"><span>Sender Key</span><strong>{{ config.sender_key_set }}</strong></div>
         <div class="status-line"><span>API Key</span><strong>{{ config.key_set }}</strong></div>
         <div class="status-line"><span>모드</span><strong class="pill {{ 'safe' if config.test_mode == 'Y' else 'warn' }}">{{ '데모 모드' if config.demo else 'API 테스트' if config.test_mode == 'Y' else '실발송' }}</strong></div>
-        <form method="post" action="{{ url_for('check_api') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <form method="post" action="{{ url_for('web.check_api') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
           <button type="submit" class="ghost full">API·템플릿 설정 확인</button>
         </form>
       </div>
@@ -53,9 +53,9 @@
     <section class="panel steps-panel">
       <div class="section-title">
         <div><p class="eyebrow">Step 1</p><h2>엑셀 파일 불러오기</h2></div>
-        <div class="title-actions"><a class="ghost-link" href="{{ url_for('download_sample') }}">샘플 엑셀</a>{% if config.demo %}<form method="post" action="{{ url_for('load_demo') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="primary">가상 샘플 불러오기</button></form>{% endif %}<form method="post" action="{{ url_for('clear_preview_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="ghost">미리보기 비우기</button></form></div>
+        <div class="title-actions"><a class="ghost-link" href="{{ url_for('web.download_sample') }}">샘플 엑셀</a>{% if config.demo %}<form method="post" action="{{ url_for('web.load_demo') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="primary">가상 샘플 불러오기</button></form>{% endif %}<form method="post" action="{{ url_for('web.clear_preview_route') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button type="submit" class="ghost">미리보기 비우기</button></form></div>
       </div>
-      <form method="post" action="{{ url_for('preview') }}" enctype="multipart/form-data" class="upload-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <form method="post" action="{{ url_for('web.preview') }}" enctype="multipart/form-data" class="upload-form"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="upload-grid">
           <label class="file-card featured"><span class="file-title">통합 엑셀 파일</span><span class="file-desc">학생DB와 데일리 리포트 시트가 한 파일 안에 있으면 이것만 선택하세요.</span><input type="file" name="combined_file" accept=".xlsx,.xlsm,.xltx,.xltm"></label>
           <label class="file-card"><span class="file-title">데일리 리포트 별도 파일 · 선택</span><span class="file-desc">학생DB와 리포트가 서로 다른 파일일 때만 선택하세요.</span><input type="file" name="daily_report_file" accept=".xlsx,.xlsm,.xltx,.xltm"></label>
@@ -68,9 +68,9 @@
     {% if not config.demo %}<section class="panel test-panel">
       <details><summary>유형별 본인 번호 수신 확인</summary>
         <p class="helper">해당 유형의 학생 1명 선택 → 본인 번호 1건 테스트 → 휴대전화 수신 확인. 수신번호는 .env의 ALIGO_TEST_PHONE입니다.</p>
-        {% for entry in test_status.entries %}<form class="receipt-form" method="post" action="{{ url_for('confirm_test') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="kind" value="{{ entry.kind }}"><strong>{{ entry.kind }}</strong>
+        {% for entry in test_status.entries %}<form class="receipt-form" method="post" action="{{ url_for('web.confirm_test') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="kind" value="{{ entry.kind }}"><strong>{{ entry.kind }}</strong>
         {% if entry.confirmed %}<span class="ready-badge">수신 확인 완료</span>{% elif entry.requested %}<label><input type="checkbox" name="receipt_confirmed" value="yes" required> 실제 휴대전화에서 수신 확인</label><button class="secondary">확인 기록</button>{% else %}<span class="muted">1건 요청 전</span>{% endif %}</form>{% endfor %}
-        <form method="post" action="{{ url_for('reset_test_status') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="ghost">수신 확인 초기화</button></form>
+        <form method="post" action="{{ url_for('web.reset_test_status') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}"><button class="ghost">수신 확인 초기화</button></form>
       </details>
     </section>{% endif %}
 
@@ -78,13 +78,13 @@
       <div class="section-title sticky-title">
         <div><p class="eyebrow">Step 2</p><h2>템플릿 유형과 변수 확인</h2></div>
         <div class="title-actions">
-          {% if has_log %}<a class="ghost-link" href="{{ url_for('download_log') }}">발송로그 다운로드</a>{% endif %}
+          {% if has_log %}<a class="ghost-link" href="{{ url_for('web.download_log') }}">발송로그 다운로드</a>{% endif %}
           <button type="button" class="ghost" onclick="toggleAll(true)">전체 선택</button>
           <button type="button" class="ghost" onclick="toggleAll(false)">전체 해제</button>
         </div>
       </div>
 
-      <form method="post" action="{{ url_for('send') }}" id="sendForm"><input type="hidden" name="preview_revision" value="{{ preview_revision }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <form method="post" action="{{ url_for('web.send') }}" id="sendForm"><input type="hidden" name="preview_revision" value="{{ preview_revision }}"><input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <div class="table-wrap">
           <table>
             <thead><tr><th class="check-col">선택</th><th>학생 / 학부모</th><th>템플릿 변수</th><th>실제 알림톡 미리보기</th><th>상태</th></tr></thead>
@@ -133,8 +133,8 @@
         <div class="send-bar">
           <div><strong>내용 확인 후 전송</strong><p id="saveHint">수정 내용 저장 → 미리보기 검수 → 대상 선택</p></div>
           <div class="send-actions">
-            <button type="submit" formaction="{{ url_for('save_preview_edits') }}" class="secondary">변수 저장 / 미리보기 갱신</button>
-            {% if not config.demo and config.test_mode == 'N' %}<button type="submit" formaction="{{ url_for('send_test') }}" class="primary send-action" onclick="return confirmOneTest()">본인 번호 1건 테스트</button>{% endif %}
+            <button type="submit" formaction="{{ url_for('web.save_preview_edits') }}" class="secondary">변수 저장 / 미리보기 갱신</button>
+            {% if not config.demo and config.test_mode == 'N' %}<button type="submit" formaction="{{ url_for('web.send_test') }}" class="primary send-action" onclick="return confirmOneTest()">본인 번호 1건 테스트</button>{% endif %}
             <button type="submit" name="mode" value="selected" class="primary send-action" onclick="return confirmSelected()">{{ "선택 시뮬레이션" if config.demo else "선택 발송" }}</button>
             <button type="submit" name="mode" value="all" class="secondary send-action" onclick="return confirmAll({{ stats.ready_count }})">{{ "전체 시뮬레이션" if config.demo else "전체 발송" }}</button>
           </div>

@@ -6,7 +6,7 @@ chcp 65001 >nul
 if not exist ".venv\Scripts\python.exe" goto NO_INSTALL
 if not exist ".env" goto NO_ENV
 
-echo Starting Parent Alimtalk Tool v7...
+echo Starting Parent Alimtalk Tool v7.1.0...
 echo Keep this window open while using the program.
 echo Press Ctrl+C here to stop it.
 echo.

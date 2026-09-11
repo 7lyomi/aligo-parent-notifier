@@ -1,7 +1,8 @@
 """Excel and form normalization. Invalid input is retained for an explicit error."""
+
+import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
-import re
 
 
 def normalize_text(value):
@@ -61,7 +62,7 @@ def normalize_percentage(value, number_format=""):
     if numeric is None:
         return text
     # Only a numeric Excel cell with percentage formatting is a stored fraction.
-    fmt = re.sub(r'"[^"]*"|\\.', '', number_format or '')
+    fmt = re.sub(r'"[^"]*"|\\.', "", number_format or "")
     if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool) and "%" in fmt:
         numeric *= 100
     return number_text(numeric) + "%"
@@ -70,7 +71,7 @@ def normalize_percentage(value, number_format=""):
 def normalized_numeric(value, suffix=""):
     text = normalize_text(value)
     if suffix and text.endswith(suffix):
-        text = text[:-len(suffix)].strip()
+        text = text[: -len(suffix)].strip()
     numeric = number(text)
     return number_text(numeric) if numeric is not None else text
 
@@ -127,6 +128,9 @@ def numeric_in_range(value, minimum=0, maximum=None, integer=False, percent=Fals
     if percent and text.endswith("%"):
         text = text[:-1]
     result = number(text)
-    return (result is not None and result >= minimum
-            and (maximum is None or result <= maximum)
-            and (not integer or result == result.to_integral_value()))
+    return (
+        result is not None
+        and result >= minimum
+        and (maximum is None or result <= maximum)
+        and (not integer or result == result.to_integral_value())
+    )
