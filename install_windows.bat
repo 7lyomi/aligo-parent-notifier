@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 echo ==========================================
-echo Parent Alimtalk Tool v7 - Setup
+echo Parent Alimtalk Tool v7.1.0 - Setup
 echo ==========================================
 echo.
 
